@@ -1,14 +1,23 @@
 import { AmenityMarker, ComplexInfo, UnitPlan } from '../types';
 
+import sunsetAerial from '../assets/images/dadaepo_ocean_aerial_sunset_1790647828204.jpg';
+import dayAerial from '../assets/images/dadaepo_ocean_aerial_day_1790647839482.jpg';
+import penthouseView from '../assets/images/dadaepo_penthouse_ocean_view_1790647785285.jpg';
+import amenitiesShowcase from '../assets/images/dadaepo_amenities_showcase_1790647800239.jpg';
+import floorplan59 from '../assets/images/floorplan_59_sqm_1790656564542.jpg';
+import floorplan84A from '../assets/images/floorplan_84a_sqm_1790656578311.jpg';
+import floorplan84B from '../assets/images/floorplan_84b_sqm_1790656591184.jpg';
+import floorplan128 from '../assets/images/floorplan_128_penthouse_1790656602050.jpg';
+
 export const IMAGES = {
-  sunsetAerial: '/src/assets/images/dadaepo_ocean_aerial_sunset_1790647828204.jpg',
-  dayAerial: '/src/assets/images/dadaepo_ocean_aerial_day_1790647839482.jpg',
-  penthouseView: '/src/assets/images/dadaepo_penthouse_ocean_view_1790647785285.jpg',
-  amenitiesShowcase: '/src/assets/images/dadaepo_amenities_showcase_1790647800239.jpg',
-  floorplan59: '/src/assets/images/floorplan_59_sqm_1790656564542.jpg',
-  floorplan84A: '/src/assets/images/floorplan_84a_sqm_1790656578311.jpg',
-  floorplan84B: '/src/assets/images/floorplan_84b_sqm_1790656591184.jpg',
-  floorplan128: '/src/assets/images/floorplan_128_penthouse_1790656602050.jpg',
+  sunsetAerial,
+  dayAerial,
+  penthouseView,
+  amenitiesShowcase,
+  floorplan59,
+  floorplan84A,
+  floorplan84B,
+  floorplan128,
 };
 
 export const COMPLEX_INFO: ComplexInfo = {

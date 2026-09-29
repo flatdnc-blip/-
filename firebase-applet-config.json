@@ -3,6 +3,7 @@
   "appId": "1:974415515221:web:79cff4d09d0ef797ee8edc",
   "apiKey": "AIzaSyBlXPACwYhBqt2naLGlrzURefKR9WFp-hg",
   "authDomain": "analytical-basis-qv9wh.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-9a146f38-fe92-4138-a716-9cf3f937a00c",
   "storageBucket": "analytical-basis-qv9wh.firebasestorage.app",
   "messagingSenderId": "974415515221",
   "measurementId": "",
