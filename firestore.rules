@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+        request.auth.token.email == 'flatdnc@gmail.com' && 
+        request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidInterestRegistration(data) {
+      return data.keys().hasAll(['name', 'phone', 'unitType', 'createdAt']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 50 &&
+        data.phone is string && data.phone.size() > 0 && data.phone.size() <= 20 &&
+        data.unitType is string && data.unitType.size() <= 20 &&
+        data.createdAt is string && data.createdAt.size() <= 40;
+    }
+
+    // VIP Interest Registration Collection
+    match /interestRegistrations/{registrationId} {
+      // Anyone can submit an interest registration inquiry
+      allow create: if isValidId(registrationId) && isValidInterestRegistration(request.resource.data);
+
+      // Only the verified administrator (flatdnc@gmail.com) can view, query, or manage leads
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}

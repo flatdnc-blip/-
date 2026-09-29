@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "InterestRegistration": {
+      "title": "InterestRegistration",
+      "description": "VIP 관심고객 등록 및 분양상담 접수 데이터",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "고유 접수 ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "고객 성명",
+          "maxLength": 50
+        },
+        "phone": {
+          "type": "string",
+          "description": "고객 연락처",
+          "maxLength": 20
+        },
+        "unitType": {
+          "type": "string",
+          "description": "희망 평형 타입 (59, 84A, 84B, 128)"
+        },
+        "primaryInterest": {
+          "type": "string",
+          "description": "주요 관심 분야 (ocean, transit, investment, amenities)"
+        },
+        "status": {
+          "type": "string",
+          "description": "상담 처리 상태 (대기, 상담완료, 부재, 보류)"
+        },
+        "registrationCode": {
+          "type": "string",
+          "description": "VIP 접수 코드 (예: VIP-123456)"
+        },
+        "wantsOceanView": {
+          "type": "boolean",
+          "description": "오션뷰 우선 희망 여부"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "접수 일시 (ISO String)"
+        },
+        "notes": {
+          "type": "string",
+          "description": "상담원 메모",
+          "maxLength": 500
+        }
+      },
+      "required": ["name", "phone", "unitType", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/interestRegistrations/{registrationId}": {
+      "schema": {
+        "$ref": "#/entities/InterestRegistration"
+      },
+      "description": "VIP 관심고객 접수 및 분양상담 신청 목록"
+    }
+  }
+}

@@ -140,7 +140,7 @@ ${rightUnit.keyFeatures.map((f) => `- ${f}`).join('\n')}
                   평면도 및 세부 스펙 1:1 정밀 비교
                 </span>
               </div>
-              <h3 className="text-lg sm:text-xl font-bold text-white font-serif">
+              <h3 className="text-lg sm:text-xl font-bold text-white font-serif break-keep">
                 타입별 평면도 & 제원 맞춤 비교 분석
               </h3>
             </div>
@@ -285,9 +285,10 @@ ${rightUnit.keyFeatures.map((f) => `- ${f}`).join('\n')}
                   onClick={() => setZoomImage({ src: leftUnit.floorPlanImage, title: `${leftUnit.name} 평면도 확대` })}
                 >
                   <img
+                    key={leftUnit.id}
                     src={leftUnit.floorPlanImage}
                     alt={`${leftUnit.name} 평면도`}
-                    className="w-full h-auto object-contain max-h-[240px] group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-auto object-contain max-h-[240px] animate-plan-fade-scale group-hover:scale-105 transition-transform duration-300"
                   />
                   <div className="absolute bottom-2 right-2 bg-slate-950/80 text-white text-[10px] px-2 py-0.5 rounded backdrop-blur-md">
                     클릭 시 확대
@@ -333,9 +334,10 @@ ${rightUnit.keyFeatures.map((f) => `- ${f}`).join('\n')}
                   onClick={() => setZoomImage({ src: rightUnit.floorPlanImage, title: `${rightUnit.name} 평면도 확대` })}
                 >
                   <img
+                    key={rightUnit.id}
                     src={rightUnit.floorPlanImage}
                     alt={`${rightUnit.name} 평면도`}
-                    className="w-full h-auto object-contain max-h-[240px] group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-auto object-contain max-h-[240px] animate-plan-fade-scale group-hover:scale-105 transition-transform duration-300"
                   />
                   <div className="absolute bottom-2 right-2 bg-slate-950/80 text-white text-[10px] px-2 py-0.5 rounded backdrop-blur-md">
                     클릭 시 확대

@@ -40,10 +40,10 @@ export const UnitComparisonSection: React.FC<UnitComparisonSectionProps> = ({
               전 세대 88% 오션뷰 특화설계
             </span>
           </div>
-          <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-serif">
+          <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-serif break-keep">
             평면 안내 & 1:1 맞춤 비교 시스템
           </h3>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 break-keep">
             원하는 두 가지 평형을 선택하여 평면도 구조, 조망 방향, 전용면적, 특화 옵션을 한눈에 1:1 비교하세요.
           </p>
         </div>
@@ -102,9 +102,10 @@ export const UnitComparisonSection: React.FC<UnitComparisonSectionProps> = ({
             className="relative rounded-xl overflow-hidden bg-white p-3 border border-slate-800 cursor-pointer shadow-inner min-h-[260px] flex items-center justify-center group"
           >
             <img
+              key={selectedUnit.id}
               src={selectedUnit.floorPlanImage}
               alt={`${selectedUnit.name} 평면도`}
-              className="w-full h-auto object-contain max-h-[280px] group-hover:scale-105 transition-transform duration-300"
+              className="w-full h-auto object-contain max-h-[280px] animate-plan-fade-scale group-hover:scale-105 transition-transform duration-300"
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
               <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-slate-950/90 text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 shadow-xl flex items-center gap-1.5">

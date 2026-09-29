@@ -16,6 +16,7 @@ import {
   Building, 
   ShoppingBag, 
   Eye, 
+  EyeOff,
   Sparkles, 
   Sun, 
   Sunset, 
@@ -23,7 +24,6 @@ import {
   ChevronRight, 
   Info,
   X,
-  ExternalLink,
   MapPin
 } from 'lucide-react';
 
@@ -42,11 +42,11 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
 }) => {
   const [activeCategory, setActiveCategory] = useState<CategoryType>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('sunset');
-  // Default to compact on mobile/tablet to avoid overlapping text badges
   const [labelMode, setLabelMode] = useState<LabelMode>('compact');
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [showOceanGuide, setShowOceanGuide] = useState<boolean>(true);
   const [showTransitGuide, setShowTransitGuide] = useState<boolean>(true);
+  const [isCleanView, setIsCleanView] = useState<boolean>(false); // One-tap hide all overlays on mobile
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Set default label mode based on screen width on mount
@@ -93,7 +93,7 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
   return (
     <div className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl">
       {/* Top Control Bar: Streamlined for Mobile & Tablet */}
-      <div className="p-2.5 sm:p-3.5 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 space-y-2">
+      <div className="p-2 sm:p-3 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 space-y-1.5 sm:space-y-2">
         {/* Row 1: View Mode Switcher */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none text-xs">
           <button
@@ -225,34 +225,45 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
             className="w-full h-auto block object-cover max-h-[80vh] mx-auto pointer-events-none"
           />
 
-          {/* 1. OCEAN VIEW PROMINENT HIGHLIGHT LAYER (다대포 해수욕장 바다조망 강조) */}
-          {(viewMode === 'sunset' || viewMode === 'day') && showOceanGuide && (
+          {/* 1. OCEAN VIEW PROMINENT HIGHLIGHT LAYER */}
+          {!isCleanView && (viewMode === 'sunset' || viewMode === 'day') && showOceanGuide && (
             <div className="absolute top-0 left-0 right-0 pointer-events-none z-10">
               <div className="h-16 sm:h-24 bg-gradient-to-b from-cyan-500/20 via-sky-500/10 to-transparent pointer-events-none" />
               
-              {/* Ocean View Compact Indicator (Clean and non-intrusive on mobile) */}
-              <div className="absolute top-2 sm:top-4 left-1/2 -translate-x-1/2 pointer-events-auto">
+              {/* Desktop/Tablet Centered Banner */}
+              <div className="hidden sm:block absolute top-3 left-1/2 -translate-x-1/2 pointer-events-auto">
                 <button
                   onClick={onOpenOceanSim}
-                  className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-950/85 hover:bg-slate-900 border border-cyan-400/50 hover:border-cyan-300 rounded-full text-white shadow-xl shadow-cyan-950/40 backdrop-blur-md transition-all cursor-pointer group"
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-950/85 hover:bg-slate-900 border border-cyan-400/50 hover:border-cyan-300 rounded-full text-white shadow-xl shadow-cyan-950/40 backdrop-blur-md transition-all cursor-pointer group"
                 >
                   <span className="flex h-2 w-2 relative">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
                   </span>
-                  <Waves className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-[11px] sm:text-xs md:text-sm font-bold tracking-tight text-cyan-200">
+                  <Waves className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs md:text-sm font-bold tracking-tight text-cyan-200">
                     다대포 해수욕장 영구 오션뷰 (도보 3분)
                   </span>
-                  <span className="hidden md:inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-900/60 text-cyan-300 border border-cyan-700/60">
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-900/60 text-cyan-300 border border-cyan-700/60">
                     전 세대 88% 조망
                   </span>
-                  <ChevronRight className="w-3 h-3 text-cyan-400 group-hover:translate-x-0.5 transition-transform" />
+                  <ChevronRight className="w-3.5 h-3.5 text-cyan-400 group-hover:translate-x-0.5 transition-transform" />
                 </button>
               </div>
 
-              {/* Ocean View Guide Curvature Line */}
-              <svg className="absolute top-0 left-0 w-full h-28 pointer-events-none opacity-40">
+              {/* Mobile Compact Top-Left Pill (Prevents Centered Clutter on Mobile!) */}
+              <div className="sm:hidden absolute top-2.5 left-2.5 pointer-events-auto">
+                <button
+                  onClick={onOpenOceanSim}
+                  className="flex items-center gap-1 px-2.5 py-1 bg-slate-950/90 border border-cyan-400/60 rounded-full text-cyan-300 shadow-md backdrop-blur-md text-[10px] font-bold"
+                >
+                  <Waves className="w-3 h-3 text-cyan-400" />
+                  <span>오션뷰 체험</span>
+                </button>
+              </div>
+
+              {/* Ocean Guide Line */}
+              <svg className="absolute top-0 left-0 w-full h-24 pointer-events-none opacity-40">
                 <defs>
                   <linearGradient id="oceanGlow" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.2" />
@@ -265,8 +276,8 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
             </div>
           )}
 
-          {/* 2. SUBWAY TRANSIT HIGHLIGHT LAYER (다대포항역 접근성) */}
-          {(viewMode === 'sunset' || viewMode === 'day') && showTransitGuide && (
+          {/* 2. SUBWAY TRANSIT HIGHLIGHT LAYER */}
+          {!isCleanView && (viewMode === 'sunset' || viewMode === 'day') && showTransitGuide && (
             <div className="absolute inset-0 pointer-events-none z-15">
               <svg className="absolute inset-0 w-full h-full pointer-events-none">
                 <defs>
@@ -285,14 +296,14 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
                 />
               </svg>
 
-              {/* Transit Walking Badge - Small pill on mobile so it doesn't block buildings */}
+              {/* Transit Walking Badge (Only on desktop/tablet to prevent mobile clutter) */}
               <div 
-                className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto"
+                className="hidden sm:block absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-auto"
                 style={{ left: '61%', top: '78%' }}
               >
-                <div className="flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 bg-slate-950/90 border border-orange-500/80 rounded-full shadow-lg backdrop-blur-md">
+                <div className="flex items-center gap-1 px-2.5 py-1 bg-slate-950/90 border border-orange-500/80 rounded-full shadow-lg backdrop-blur-md">
                   <Navigation className="w-2.5 h-2.5 text-orange-400 rotate-45" />
-                  <span className="text-[10px] sm:text-[11px] font-bold text-orange-300 whitespace-nowrap">
+                  <span className="text-[11px] font-bold text-orange-300 whitespace-nowrap">
                     도보 1분 (50m 초역세권)
                   </span>
                 </div>
@@ -301,7 +312,7 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
           )}
 
           {/* 3. INTERACTIVE PINS & LABELS OVERLAY */}
-          {(viewMode === 'sunset' || viewMode === 'day') && labelMode !== 'minimal' && (
+          {!isCleanView && (viewMode === 'sunset' || viewMode === 'day') && labelMode !== 'minimal' && (
             <div className="absolute inset-0 pointer-events-none z-20">
               {filteredMarkers.map((marker) => {
                 const isSelected = selectedMarker?.id === marker.id;
@@ -315,7 +326,6 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
                     style={{ left: `${marker.x}%`, top: `${marker.y}%` }}
                   >
                     <div className="relative group cursor-pointer" onClick={() => onSelectMarker(marker)}>
-                      {/* Radar ripples for key highlights */}
                       {(marker.highlight || isStation || isBeach) && (
                         <div 
                           className={`absolute -inset-2 rounded-full opacity-70 animate-radar-ripple pointer-events-none ${
@@ -328,7 +338,6 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
                         />
                       )}
 
-                      {/* Main Pin Button (Sized appropriately for mobile touch and visibility) */}
                       <button
                         className={`relative flex items-center justify-center rounded-full shadow-xl transition-all duration-300 ${
                           isSelected
@@ -357,15 +366,15 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
                         )}
                       </button>
 
-                      {/* Expanded Badge Callout (Only in Full Mode, or on Desktop/Selected) */}
+                      {/* Desktop Expanded Label Mode */}
                       {(labelMode === 'full' || isSelected) && (
                         <div
-                          className={`absolute left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap z-25 transition-all duration-200 pointer-events-none ${
+                          className={`absolute left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap z-25 transition-all duration-200 pointer-events-none hidden sm:block ${
                             isSelected ? 'scale-105 z-30' : 'group-hover:scale-105'
                           }`}
                         >
                           <div
-                            className={`flex flex-col items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg shadow-xl backdrop-blur-md border ${
+                            className={`flex flex-col items-center px-2.5 py-1 rounded-lg shadow-xl backdrop-blur-md border ${
                               isStation
                                 ? 'bg-orange-950/95 border-orange-500 text-orange-100 ring-1 ring-orange-500/40'
                                 : isBeach
@@ -373,12 +382,12 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
                                 : 'bg-slate-950/90 border-slate-700 text-slate-100'
                             }`}
                           >
-                            <div className="flex items-center gap-1 sm:gap-1.5">
-                              <span className="text-[10px] sm:text-xs font-bold tracking-tight">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold tracking-tight">
                                 {marker.title}
                               </span>
                               {marker.distance && (
-                                <span className={`text-[9px] sm:text-[10px] font-semibold px-1 py-0.2 rounded hidden sm:inline ${
+                                <span className={`text-[10px] font-semibold px-1 py-0.2 rounded ${
                                   isStation
                                     ? 'bg-orange-500 text-white'
                                     : isBeach
@@ -389,7 +398,7 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
                                 </span>
                               )}
                             </div>
-                            <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium hidden sm:inline">
+                            <span className="text-[10px] text-slate-400 font-medium">
                               {marker.tag}
                             </span>
                           </div>
@@ -403,9 +412,9 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
           )}
         </div>
 
-        {/* View Mode Description Banner (Positioned cleanly at bottom so it doesn't cover the image) */}
+        {/* View Mode Description Banners */}
         {viewMode === 'penthouse' && (
-          <div className="absolute bottom-12 sm:bottom-4 left-3 right-3 sm:left-4 sm:right-auto max-w-sm sm:max-w-md bg-slate-950/95 backdrop-blur-md border border-cyan-500/60 p-3 sm:p-4 rounded-xl text-white shadow-2xl z-30">
+          <div className="absolute bottom-4 left-3 right-3 sm:left-4 sm:right-auto max-w-sm bg-slate-950/95 backdrop-blur-md border border-cyan-500/60 p-3.5 rounded-xl text-white shadow-2xl z-30">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1.5 text-cyan-400">
                 <Eye className="w-3.5 h-3.5" />
@@ -415,10 +424,10 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
-            <h4 className="text-xs sm:text-sm font-bold text-white mb-1">
+            <h4 className="text-xs sm:text-sm font-bold text-white mb-1 break-keep">
               다대포 해수욕장 영구 오션뷰 파노라마
             </h4>
-            <p className="text-[11px] sm:text-xs text-slate-300 line-clamp-2 leading-relaxed mb-2.5">
+            <p className="text-[11px] text-slate-300 leading-relaxed mb-2.5 break-keep">
               거실과 테라스에서 매일 펼쳐지는 붉은 노을과 수평선! 전 세대 약 88% 조망 특화 설계.
             </p>
             <div className="flex items-center gap-2">
@@ -439,7 +448,7 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
         )}
 
         {viewMode === 'amenities' && (
-          <div className="absolute bottom-12 sm:bottom-4 left-3 right-3 sm:left-4 sm:right-auto max-w-sm sm:max-w-md bg-slate-950/95 backdrop-blur-md border border-purple-500/60 p-3 sm:p-4 rounded-xl text-white shadow-2xl z-30">
+          <div className="absolute bottom-4 left-3 right-3 sm:left-4 sm:right-auto max-w-sm bg-slate-950/95 backdrop-blur-md border border-purple-500/60 p-3.5 rounded-xl text-white shadow-2xl z-30">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1.5 text-purple-400">
                 <Sparkles className="w-3.5 h-3.5" />
@@ -449,10 +458,10 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
-            <h4 className="text-xs sm:text-sm font-bold text-white mb-1">
+            <h4 className="text-xs sm:text-sm font-bold text-white mb-1 break-keep">
               호텔급 스카이라운지 · 사우나 · 골프 · 스트리트몰
             </h4>
-            <p className="text-[11px] sm:text-xs text-slate-300 line-clamp-2 leading-relaxed mb-2.5">
+            <p className="text-[11px] text-slate-300 leading-relaxed mb-2.5 break-keep">
               39층 오션뷰 스카이라운지부터 120m 원스톱 상가, GDR 골프클럽과 핀란드식 사우나 완비.
             </p>
             <button
@@ -464,52 +473,53 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
           </div>
         )}
 
-        {/* Selected Marker Mobile Quick Bottom Drawer (Solves Mobile Text Collision!) */}
+        {/* Selected Marker Mobile Quick Bottom Drawer (Completely clear of other controls!) */}
         {selectedMarker && (
-          <div className="absolute bottom-3 left-3 right-3 sm:hidden z-30 bg-slate-950/95 border border-amber-500/50 p-3 rounded-xl shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-2 duration-150">
+          <div className="absolute bottom-3 left-3 right-3 sm:hidden z-30 bg-slate-950/98 border border-amber-500/60 p-3 rounded-2xl shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-2 duration-150">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
                 {selectedMarker.tag}
               </span>
-              <button onClick={() => onSelectMarker(null as any)} className="text-slate-400 hover:text-white p-0.5">
-                <X className="w-3.5 h-3.5" />
+              <button onClick={() => onSelectMarker(null as any)} className="text-slate-400 hover:text-white p-1">
+                <X className="w-4 h-4" />
               </button>
             </div>
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <h5 className="text-xs font-bold text-white truncate">{selectedMarker.title}</h5>
-                <p className="text-[11px] text-amber-300 flex items-center gap-1">
+                <p className="text-[11px] text-amber-300 flex items-center gap-1 mt-0.5">
                   <MapPin className="w-3 h-3 shrink-0" />
                   <span>{selectedMarker.distance}</span>
                 </p>
               </div>
               <button
                 onClick={() => onSelectMarker(selectedMarker)}
-                className="px-2.5 py-1 bg-amber-500 text-slate-950 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer"
+                className="px-3 py-1.5 bg-amber-500 text-slate-950 rounded-lg text-xs font-bold shrink-0 cursor-pointer"
               >
-                상세보기
+                상세정보 보기
               </button>
             </div>
           </div>
         )}
 
-        {/* Floating Zoom & Display Controls (Consolidated & Compact for Mobile/Tablet) */}
-        <div className="absolute bottom-3 right-3 z-25 flex items-center gap-1.5 bg-slate-950/85 backdrop-blur-md p-1 rounded-xl border border-slate-800 shadow-xl">
-          <div className="flex items-center">
+        {/* FLOATING CONTROLS: Re-anchored to TOP-RIGHT on Mobile & Desktop to Prevent ALL Overlap! */}
+        <div className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 z-25 flex flex-col sm:flex-row items-center gap-1 bg-slate-950/90 backdrop-blur-md p-1 rounded-xl border border-slate-800 shadow-xl">
+          {/* Zoom Buttons */}
+          <div className="flex flex-col sm:flex-row items-center">
             <button
               onClick={handleZoomIn}
-              className="p-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               title="확대"
               aria-label="Zoom in"
             >
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
-            <span className="text-[10px] font-mono font-medium text-slate-400 w-8 text-center">
+            <span className="text-[10px] font-mono font-medium text-slate-400 w-7 text-center">
               {Math.round(zoomLevel * 100)}%
             </span>
             <button
               onClick={handleZoomOut}
-              className="p-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               title="축소"
               aria-label="Zoom out"
             >
@@ -517,7 +527,7 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
             </button>
             <button
               onClick={handleZoomReset}
-              className="p-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer hidden sm:block"
               title="원래 크기"
               aria-label="Reset zoom"
             >
@@ -525,26 +535,42 @@ export const AerialViewer: React.FC<AerialViewerProps> = ({
             </button>
           </div>
 
-          <div className="w-px h-3.5 bg-slate-800" />
+          <div className="w-full h-px sm:w-px sm:h-3.5 bg-slate-800" />
 
-          {/* Label Display Mode Switcher */}
+          {/* Clean View Toggle (Hides all overlays with 1 tap!) */}
+          <button
+            onClick={() => setIsCleanView(!isCleanView)}
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer text-[10px] flex items-center gap-1 ${
+              isCleanView
+                ? 'bg-amber-500 text-slate-950 font-bold'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            title={isCleanView ? '핀 및 가이드 표시' : '조감도만 깨끗하게 보기 (클린 뷰)'}
+          >
+            {isCleanView ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            <span className="hidden md:inline">
+              {isCleanView ? '핀 표시' : '클린뷰'}
+            </span>
+          </button>
+
+          {/* Label Mode Switcher on Desktop */}
           <button
             onClick={() => setLabelMode((prev) => (prev === 'compact' ? 'full' : prev === 'full' ? 'minimal' : 'compact'))}
-            className={`p-1 rounded-lg transition-colors cursor-pointer text-[10px] flex items-center gap-1 ${
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer text-[10px] hidden sm:flex items-center gap-1 ${
               labelMode === 'full'
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
-            title="핀 표시 모드 (핀만 / 상세 / 숨김)"
+            title="핀 라벨 모드"
           >
             <Layers className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">
-              {labelMode === 'full' ? '상세 라벨' : labelMode === 'compact' ? '핀만 보기' : '라벨 숨김'}
+            <span className="hidden md:inline">
+              {labelMode === 'full' ? '상세 라벨' : '핀만 보기'}
             </span>
           </button>
         </div>
 
-        {/* Desktop Quick Toggles (Bottom-Left: Ocean & Transit Highlights) */}
+        {/* Desktop Bottom-Left Quick Toggles */}
         <div className="absolute bottom-3 left-3 z-25 hidden md:flex items-center gap-2 bg-slate-950/85 backdrop-blur-md px-2.5 py-1 rounded-xl border border-slate-800 shadow-xl text-xs">
           <label className="flex items-center gap-1.5 text-cyan-300 cursor-pointer select-none">
             <input

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { AerialViewer } from './components/AerialViewer';
 import { MarkerDetailModal } from './components/MarkerDetailModal';
@@ -15,6 +15,9 @@ import { PosterDownloadModal } from './components/PosterDownloadModal';
 import { GoogleDriveModal } from './components/GoogleDriveModal';
 import { UnitComparisonModal } from './components/UnitComparisonModal';
 import { UnitComparisonSection } from './components/UnitComparisonSection';
+import { AdminLeadDashboardModal } from './components/AdminLeadDashboardModal';
+import { PromoVideoSection } from './components/PromoVideoSection';
+import { LeadNotificationToast } from './components/LeadNotificationToast';
 import { 
   AMENITY_MARKERS, 
   COMPLEX_INFO 
@@ -42,6 +45,7 @@ export default function App() {
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   const [isGoogleDriveOpen, setIsGoogleDriveOpen] = useState(false);
   const [isComparisonOpen, setIsComparisonOpen] = useState(false);
+  const [isAdminDashboardOpen, setIsAdminDashboardOpen] = useState(false);
   const [targetUnitForInterest, setTargetUnitForInterest] = useState<string | undefined>(undefined);
 
   // Quick select helper for ocean view marker
@@ -57,6 +61,19 @@ export default function App() {
     if (station) setSelectedMarker(station);
   };
 
+  const scrollToVideo = () => {
+    const el = document.getElementById('promo-video-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  useEffect(() => {
+    const handleOpenAdmin = () => setIsAdminDashboardOpen(true);
+    window.addEventListener('open-admin-lead-dashboard', handleOpenAdmin);
+    return () => window.removeEventListener('open-admin-lead-dashboard', handleOpenAdmin);
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-amber-500 selection:text-slate-950">
       {/* Sticky Premium Header */}
@@ -71,6 +88,8 @@ export default function App() {
         onOpenAmenities={() => setIsAmenitiesOpen(true)}
         onOpenGoogleDrive={() => setIsGoogleDriveOpen(true)}
         onOpenComparison={() => setIsComparisonOpen(true)}
+        onOpenAdminDashboard={() => setIsAdminDashboardOpen(true)}
+        onScrollToVideo={scrollToVideo}
       />
 
       {/* Main Container */}
@@ -115,7 +134,7 @@ export default function App() {
               <p className="text-sm sm:text-base lg:text-lg font-black text-white font-mono leading-none sm:leading-tight">
                 전 세대 88%
               </p>
-              <p className="text-[9px] sm:text-[11px] text-slate-400 truncate">180° 영구 파노라마</p>
+              <p className="text-[9px] sm:text-[11px] text-slate-400 break-keep">180° 영구 조망</p>
             </button>
 
             <button
@@ -129,7 +148,7 @@ export default function App() {
               <p className="text-sm sm:text-base lg:text-lg font-black text-white font-mono leading-none sm:leading-tight">
                 도보 1분
               </p>
-              <p className="text-[9px] sm:text-[11px] text-slate-400 truncate">1호선 초역세권</p>
+              <p className="text-[9px] sm:text-[11px] text-slate-400 break-keep">1호선 50m</p>
             </button>
 
             <button
@@ -143,7 +162,7 @@ export default function App() {
               <p className="text-sm sm:text-base lg:text-lg font-black text-white font-mono leading-none sm:leading-tight">
                 39F 라운지
               </p>
-              <p className="text-[9px] sm:text-[11px] text-slate-400 truncate">120m 스트리트몰</p>
+              <p className="text-[9px] sm:text-[11px] text-slate-400 break-keep">120m 스트리트몰</p>
             </button>
           </div>
         </div>
@@ -157,6 +176,17 @@ export default function App() {
             onOpenOceanSim={() => setIsOceanSimOpen(true)}
           />
         </section>
+
+        {/* OFFICIAL PROMOTIONAL BRAND VIDEO SECTION */}
+        <div id="promo-video-section">
+          <PromoVideoSection
+            onOpenInterest={() => {
+              setTargetUnitForInterest(undefined);
+              setIsInterestOpen(true);
+            }}
+            onOpenGoogleDrive={() => setIsGoogleDriveOpen(true)}
+          />
+        </div>
 
         {/* UNIT COMPARISON & FLOOR PLAN SHOWCASE SECTION */}
         <UnitComparisonSection
@@ -194,6 +224,13 @@ export default function App() {
               </button>
               <span>·</span>
               <button
+                onClick={scrollToVideo}
+                className="text-rose-400 hover:underline cursor-pointer font-semibold"
+              >
+                공식 홍보영상
+              </button>
+              <span>·</span>
+              <button
                 onClick={() => setIsOceanSimOpen(true)}
                 className="text-cyan-400 hover:underline cursor-pointer"
               >
@@ -212,6 +249,13 @@ export default function App() {
                 className="text-amber-400 hover:underline cursor-pointer"
               >
                 평면 비교
+              </button>
+              <span>·</span>
+              <button
+                onClick={() => setIsAdminDashboardOpen(true)}
+                className="text-emerald-400 hover:underline cursor-pointer font-bold"
+              >
+                고객 DB 관리
               </button>
               <span>·</span>
               <button
@@ -314,6 +358,21 @@ export default function App() {
           setIsComparisonOpen(false);
           setIsGoogleDriveOpen(true);
         }}
+      />
+
+      {/* 8. Admin Lead Management Dashboard Modal */}
+      <AdminLeadDashboardModal
+        isOpen={isAdminDashboardOpen}
+        onClose={() => setIsAdminDashboardOpen(false)}
+        onOpenGoogleDrive={() => {
+          setIsAdminDashboardOpen(false);
+          setIsGoogleDriveOpen(true);
+        }}
+      />
+
+      {/* 9. Real-Time Lead In-App Messenger Notification Toast */}
+      <LeadNotificationToast
+        onOpenDashboard={() => setIsAdminDashboardOpen(true)}
       />
     </div>
   );

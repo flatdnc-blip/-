@@ -28,12 +28,27 @@
   }
 }
 
+@keyframes plan-fade-scale {
+  0% {
+    opacity: 0;
+    transform: scale(0.93);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .animate-pulse-slow {
   animation: pulse-slow 2.5s infinite ease-in-out;
 }
 
 .animate-radar-ripple {
   animation: radar-ripple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+.animate-plan-fade-scale {
+  animation: plan-fade-scale 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Custom scrollbars */
