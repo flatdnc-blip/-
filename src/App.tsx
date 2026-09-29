@@ -12,6 +12,9 @@ import { AmenitiesGalleryModal } from './components/AmenitiesGalleryModal';
 import { ComplexOverview } from './components/ComplexOverview';
 import { InterestRegistrationModal } from './components/InterestRegistrationModal';
 import { PosterDownloadModal } from './components/PosterDownloadModal';
+import { GoogleDriveModal } from './components/GoogleDriveModal';
+import { UnitComparisonModal } from './components/UnitComparisonModal';
+import { UnitComparisonSection } from './components/UnitComparisonSection';
 import { 
   AMENITY_MARKERS, 
   COMPLEX_INFO 
@@ -37,6 +40,9 @@ export default function App() {
   const [isAmenitiesOpen, setIsAmenitiesOpen] = useState(false);
   const [isInterestOpen, setIsInterestOpen] = useState(false);
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
+  const [isGoogleDriveOpen, setIsGoogleDriveOpen] = useState(false);
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
+  const [targetUnitForInterest, setTargetUnitForInterest] = useState<string | undefined>(undefined);
 
   // Quick select helper for ocean view marker
   const handleOpenOceanFromHero = () => {
@@ -56,10 +62,15 @@ export default function App() {
       {/* Sticky Premium Header */}
       <Header
         complexInfo={COMPLEX_INFO}
-        onOpenInterest={() => setIsInterestOpen(true)}
+        onOpenInterest={() => {
+          setTargetUnitForInterest(undefined);
+          setIsInterestOpen(true);
+        }}
         onOpenDownload={() => setIsDownloadOpen(true)}
         onOpenOceanSim={() => setIsOceanSimOpen(true)}
         onOpenAmenities={() => setIsAmenitiesOpen(true)}
+        onOpenGoogleDrive={() => setIsGoogleDriveOpen(true)}
+        onOpenComparison={() => setIsComparisonOpen(true)}
       />
 
       {/* Main Container */}
@@ -147,6 +158,15 @@ export default function App() {
           />
         </section>
 
+        {/* UNIT COMPARISON & FLOOR PLAN SHOWCASE SECTION */}
+        <UnitComparisonSection
+          onOpenComparison={() => setIsComparisonOpen(true)}
+          onOpenInterest={(unitId) => {
+            setTargetUnitForInterest(unitId);
+            setIsInterestOpen(true);
+          }}
+        />
+
         {/* 4 CORE VALUE PILLARS & PROJECT OVERVIEW SECTION */}
         <ComplexOverview
           onOpenOceanSim={() => setIsOceanSimOpen(true)}
@@ -185,6 +205,20 @@ export default function App() {
                 className="text-purple-400 hover:underline cursor-pointer"
               >
                 편의시설 안내
+              </button>
+              <span>·</span>
+              <button
+                onClick={() => setIsComparisonOpen(true)}
+                className="text-amber-400 hover:underline cursor-pointer"
+              >
+                평면 비교
+              </button>
+              <span>·</span>
+              <button
+                onClick={() => setIsGoogleDriveOpen(true)}
+                className="text-blue-400 hover:underline cursor-pointer flex items-center gap-1"
+              >
+                Drive 보관함
               </button>
               <span>·</span>
               <button
@@ -244,13 +278,42 @@ export default function App() {
       {/* 4. Interest Registration / VIP Tour Reservation Modal */}
       <InterestRegistrationModal
         isOpen={isInterestOpen}
-        onClose={() => setIsInterestOpen(false)}
+        onClose={() => {
+          setIsInterestOpen(false);
+          setTargetUnitForInterest(undefined);
+        }}
+        initialUnitType={targetUnitForInterest}
       />
 
       {/* 5. High-Resolution Poster Download / Print Modal */}
       <PosterDownloadModal
         isOpen={isDownloadOpen}
         onClose={() => setIsDownloadOpen(false)}
+        onOpenGoogleDrive={() => {
+          setIsDownloadOpen(false);
+          setIsGoogleDriveOpen(true);
+        }}
+      />
+
+      {/* 6. Google Drive Cloud Storage & File Manager Modal */}
+      <GoogleDriveModal
+        isOpen={isGoogleDriveOpen}
+        onClose={() => setIsGoogleDriveOpen(false)}
+      />
+
+      {/* 7. Unit Side-by-Side Comparison Modal */}
+      <UnitComparisonModal
+        isOpen={isComparisonOpen}
+        onClose={() => setIsComparisonOpen(false)}
+        onOpenInterest={(uId) => {
+          setIsComparisonOpen(false);
+          setTargetUnitForInterest(uId);
+          setIsInterestOpen(true);
+        }}
+        onOpenGoogleDrive={() => {
+          setIsComparisonOpen(false);
+          setIsGoogleDriveOpen(true);
+        }}
       />
     </div>
   );

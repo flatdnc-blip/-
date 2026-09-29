@@ -46,3 +46,29 @@ export interface CustomerInquiry {
   wantsOceanView: boolean;
   privacyAgreed: boolean;
 }
+
+export interface UnitPlan {
+  id: string;
+  name: string;
+  subName: string;
+  exclusiveArea: number; // m²
+  supplyArea: number; // m²
+  contractArea: number; // m²
+  pyeong: number;
+  rooms: number;
+  bathrooms: number;
+  orientation: string;
+  oceanView: string;
+  structure: string;
+  totalUnits: number;
+  estimatedPrice: string;
+  maintenanceFee: string;
+  keyFeatures: string[];
+  floorPlanImage: string;
+  badge: string;
+  recommendedFor: string;
+  bayCount: string;
+  ceilingHeight: string;
+  balconyExpansion: string;
+}
+

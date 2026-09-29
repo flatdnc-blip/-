@@ -8,7 +8,9 @@ import {
   BookmarkCheck, 
   Compass,
   TrainFront,
-  Waves
+  Waves,
+  HardDrive,
+  SplitSquareVertical
 } from 'lucide-react';
 import { ComplexInfo } from '../types';
 
@@ -18,6 +20,8 @@ interface HeaderProps {
   onOpenDownload: () => void;
   onOpenOceanSim: () => void;
   onOpenAmenities: () => void;
+  onOpenGoogleDrive: () => void;
+  onOpenComparison: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -26,6 +30,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenDownload,
   onOpenOceanSim,
   onOpenAmenities,
+  onOpenGoogleDrive,
+  onOpenComparison,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 transition-all">
@@ -58,6 +64,26 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Quick Action Navigation */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Unit Comparison Button */}
+            <button
+              onClick={onOpenComparison}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-amber-300 hover:text-white bg-amber-950/50 hover:bg-amber-900/60 border border-amber-800/60 rounded-lg transition-colors cursor-pointer shadow-sm group"
+              title="평면도 1:1 맞춤 비교 분석"
+            >
+              <SplitSquareVertical className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+              <span className="hidden sm:inline">평면 비교</span>
+            </button>
+
+            {/* Google Drive Integration Button */}
+            <button
+              onClick={onOpenGoogleDrive}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-300 hover:text-white bg-blue-950/60 hover:bg-blue-900/70 border border-blue-700/60 rounded-lg transition-colors cursor-pointer shadow-sm group"
+              title="Google Drive 분양 자료 클라우드 보관함"
+            >
+              <HardDrive className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+              <span className="hidden sm:inline">Drive 보관함</span>
+            </button>
+
             <button
               onClick={onOpenOceanSim}
               className="hidden lg:flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-cyan-300 hover:text-white bg-cyan-950/50 hover:bg-cyan-900/60 border border-cyan-800/60 rounded-lg transition-colors cursor-pointer"

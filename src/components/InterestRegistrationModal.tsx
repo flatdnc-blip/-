@@ -15,19 +15,28 @@ import confetti from 'canvas-confetti';
 interface InterestRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialUnitType?: string;
 }
 
 export const InterestRegistrationModal: React.FC<InterestRegistrationModalProps> = ({
   isOpen,
   onClose,
+  initialUnitType,
 }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [unitType, setUnitType] = useState('84A');
+  const [unitType, setUnitType] = useState(initialUnitType || '84A');
   const [primaryInterest, setPrimaryInterest] = useState('ocean');
   const [agreed, setAgreed] = useState(true);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [resId, setResId] = useState('');
+
+  // Sync unitType when initialUnitType changes or modal opens
+  React.useEffect(() => {
+    if (initialUnitType) {
+      setUnitType(initialUnitType);
+    }
+  }, [initialUnitType, isOpen]);
 
   if (!isOpen) return null;
 

@@ -7,19 +7,22 @@ import {
   Check, 
   Waves, 
   Train, 
-  Building2,
-  FileImage
+  Building2, 
+  FileImage,
+  HardDrive
 } from 'lucide-react';
 import { IMAGES, COMPLEX_INFO } from '../data/apartmentData';
 
 interface PosterDownloadModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenGoogleDrive: () => void;
 }
 
 export const PosterDownloadModal: React.FC<PosterDownloadModalProps> = ({
   isOpen,
   onClose,
+  onOpenGoogleDrive,
 }) => {
   const [selectedTheme, setSelectedTheme] = useState<'sunset' | 'day'>('sunset');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -232,6 +235,17 @@ export const PosterDownloadModal: React.FC<PosterDownloadModalProps> = ({
             ※ 분양 홍보, 전단지, 온라인 게시용 고화질 이미지로 즉시 활용 가능합니다.
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => {
+                onClose();
+                onOpenGoogleDrive();
+              }}
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-950/80 hover:bg-blue-900 border border-blue-700/60 text-blue-300 hover:text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              title="Google Drive 클라우드 보관함에 저장"
+            >
+              <HardDrive className="w-4 h-4 text-blue-400" />
+              <span>Drive에 보관</span>
+            </button>
             <button
               onClick={handlePrint}
               className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
