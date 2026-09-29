@@ -74,76 +74,76 @@ export default function App() {
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-8 space-y-5 sm:space-y-8">
         {/* Hero Title & Value Proposition Banner */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2 border-b border-slate-800/80">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3 sm:gap-6 pb-2 border-b border-slate-800/80">
           <div>
-            <div className="flex flex-wrap items-center gap-2 mb-2 text-xs">
-              <span className="px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/30 font-bold uppercase tracking-wider">
-                부산 서남부 프리미엄 랜드마크
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 text-[11px] sm:text-xs">
+              <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/30 font-bold uppercase tracking-wider">
+                부산 서남부 랜드마크
               </span>
-              <span className="text-slate-500 hidden sm:inline">|</span>
+              <span className="text-slate-600 hidden sm:inline">|</span>
               <span className="text-cyan-300 font-semibold flex items-center gap-1">
-                <Waves className="w-3.5 h-3.5 text-cyan-400" />
+                <Waves className="w-3 h-3 text-cyan-400" />
                 다대포 해수욕장 영구 바다조망 (도보 3분)
               </span>
-              <span className="text-slate-500 hidden sm:inline">|</span>
-              <span className="text-orange-300 font-semibold flex items-center gap-1">
-                <Train className="w-3.5 h-3.5 text-orange-400" />
+              <span className="text-slate-600 hidden md:inline">|</span>
+              <span className="text-orange-300 font-semibold hidden md:inline-flex items-center gap-1">
+                <Train className="w-3 h-3 text-orange-400" />
                 1호선 다대포항역 도보 1분 50m 초역세권
               </span>
             </div>
 
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight font-serif">
+            <h2 className="text-xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight font-serif leading-tight">
               {COMPLEX_INFO.name}
-              <span className="block text-lg sm:text-xl font-normal text-slate-300 font-sans mt-1">
+              <span className="block text-xs sm:text-base font-normal text-slate-300 font-sans mt-0.5 sm:mt-1">
                 {COMPLEX_INFO.subTitle}
               </span>
             </h2>
           </div>
 
-          {/* Quick Stat Highlights on the Right */}
-          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          {/* Quick Stat Highlights - Mobile-optimized 3-column grid */}
+          <div className="grid grid-cols-3 gap-1.5 sm:flex sm:items-center sm:gap-3 shrink-0">
             <button
               onClick={handleOpenOceanFromHero}
-              className="flex-1 sm:flex-initial p-3 rounded-xl bg-slate-900 hover:bg-slate-800/90 border border-cyan-500/30 hover:border-cyan-400 transition-all cursor-pointer text-left group"
+              className="p-2 sm:p-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/30 hover:border-cyan-400 transition-all cursor-pointer text-left group"
             >
-              <div className="flex items-center gap-1.5 text-cyan-400 text-xs font-bold mb-0.5">
-                <Waves className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1 text-cyan-400 text-[10px] sm:text-xs font-bold mb-0.5">
+                <Waves className="w-3 h-3 shrink-0" />
                 <span>바다조망</span>
               </div>
-              <p className="text-base sm:text-lg font-black text-white font-mono">
+              <p className="text-sm sm:text-base lg:text-lg font-black text-white font-mono leading-none sm:leading-tight">
                 전 세대 88%
               </p>
-              <p className="text-[11px] text-slate-400">180° 영구 파노라마</p>
+              <p className="text-[9px] sm:text-[11px] text-slate-400 truncate">180° 영구 파노라마</p>
             </button>
 
             <button
               onClick={handleSelectStation}
-              className="flex-1 sm:flex-initial p-3 rounded-xl bg-slate-900 hover:bg-slate-800/90 border border-orange-500/30 hover:border-orange-400 transition-all cursor-pointer text-left group"
+              className="p-2 sm:p-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-orange-500/30 hover:border-orange-400 transition-all cursor-pointer text-left group"
             >
-              <div className="flex items-center gap-1.5 text-orange-400 text-xs font-bold mb-0.5">
-                <Train className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1 text-orange-400 text-[10px] sm:text-xs font-bold mb-0.5">
+                <Train className="w-3 h-3 shrink-0" />
                 <span>다대포항역</span>
               </div>
-              <p className="text-base sm:text-lg font-black text-white font-mono">
-                도보 1분 50m
+              <p className="text-sm sm:text-base lg:text-lg font-black text-white font-mono leading-none sm:leading-tight">
+                도보 1분
               </p>
-              <p className="text-[11px] text-slate-400">1호선 초역세권 직결</p>
+              <p className="text-[9px] sm:text-[11px] text-slate-400 truncate">1호선 초역세권</p>
             </button>
 
             <button
               onClick={() => setIsAmenitiesOpen(true)}
-              className="flex-1 sm:flex-initial p-3 rounded-xl bg-slate-900 hover:bg-slate-800/90 border border-purple-500/30 hover:border-purple-400 transition-all cursor-pointer text-left group"
+              className="p-2 sm:p-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-purple-500/30 hover:border-purple-400 transition-all cursor-pointer text-left group"
             >
-              <div className="flex items-center gap-1.5 text-purple-400 text-xs font-bold mb-0.5">
-                <Sparkles className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1 text-purple-400 text-[10px] sm:text-xs font-bold mb-0.5">
+                <Sparkles className="w-3 h-3 shrink-0" />
                 <span>편의시설</span>
               </div>
-              <p className="text-base sm:text-lg font-black text-white font-mono">
+              <p className="text-sm sm:text-base lg:text-lg font-black text-white font-mono leading-none sm:leading-tight">
                 39F 라운지
               </p>
-              <p className="text-[11px] text-slate-400">120m 스트리트몰</p>
+              <p className="text-[9px] sm:text-[11px] text-slate-400 truncate">120m 스트리트몰</p>
             </button>
           </div>
         </div>
