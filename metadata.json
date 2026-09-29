@@ -1,0 +1,6 @@
+{
+  "name": "다대포 오션시티 프레스티지 조감도 홍보관",
+  "description": "다대포 해수욕장 파노라마 오션뷰와 다대포항역 초역세권 프리미엄을 담은 아파트 조감도 및 인터랙티브 편의시설 안내 시스템",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
