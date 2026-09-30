@@ -167,18 +167,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* PRIMARY INTERACTIVE AERIAL VIEWER COMPONENT */}
-        <section aria-label="아파트 전체 조감도">
-          <AerialViewer
-            markers={AMENITY_MARKERS}
-            selectedMarker={selectedMarker}
-            onSelectMarker={(m) => setSelectedMarker(m)}
-            onOpenOceanSim={() => setIsOceanSimOpen(true)}
-          />
-        </section>
-
-        {/* OFFICIAL PROMOTIONAL BRAND VIDEO SECTION */}
-        <div id="promo-video-section">
+        {/* 1. OFFICIAL PROMOTIONAL BRAND VIDEO SECTION (Immediately visible upon opening the page) */}
+        <div id="promo-video-section" className="animate-in fade-in duration-300">
           <PromoVideoSection
             onOpenInterest={() => {
               setTargetUnitForInterest(undefined);
@@ -187,6 +177,16 @@ export default function App() {
             onOpenGoogleDrive={() => setIsGoogleDriveOpen(true)}
           />
         </div>
+
+        {/* 2. PRIMARY INTERACTIVE AERIAL VIEWER COMPONENT */}
+        <section aria-label="아파트 전체 조감도">
+          <AerialViewer
+            markers={AMENITY_MARKERS}
+            selectedMarker={selectedMarker}
+            onSelectMarker={(m) => setSelectedMarker(m)}
+            onOpenOceanSim={() => setIsOceanSimOpen(true)}
+          />
+        </section>
 
         {/* UNIT COMPARISON & FLOOR PLAN SHOWCASE SECTION */}
         <UnitComparisonSection
