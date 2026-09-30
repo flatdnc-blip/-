@@ -37,5 +37,11 @@ service cloud.firestore {
       // Only the verified administrator (flatdnc@gmail.com) can view, query, or manage leads
       allow read, update, delete: if isAdmin();
     }
+
+    // Public Site Configuration (Promotional Video URL, Google Drive link, announcements)
+    match /siteSettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }

@@ -10,16 +10,28 @@ import {
   Sparkles, 
   Waves, 
   Train, 
-  Trees, 
   CheckCircle2, 
   HardDrive, 
   Film, 
-  ExternalLink,
   RefreshCw,
   X,
-  FolderOpen
+  FolderOpen,
+  Share2,
+  AlertCircle
 } from 'lucide-react';
 import { IMAGES } from '../data/apartmentData';
+import { 
+  DEFAULT_PROMO_CONFIG, 
+  SitePromoVideoConfig, 
+  extractGoogleDriveFileId, 
+  toGoogleDriveEmbedUrl 
+} from '../config/videoConfig';
+import { 
+  fetchSharedPromoVideoConfig, 
+  saveSharedPromoVideoConfig, 
+  subscribePromoVideoConfig,
+  getLocalPromoVideoConfig 
+} from '../services/siteConfigService';
 import { 
   uploadFileToDrive, 
   getOrCreateApartmentFolder, 
@@ -32,54 +44,50 @@ interface PromoVideoSectionProps {
   onOpenGoogleDrive?: () => void;
 }
 
-const STORAGE_VIDEO_KEY = 'dadaepo_promo_video_url';
-const DEFAULT_VIDEO_PATH = '/assets/videos/dadaepo_promo_brand_video.mp4';
-
-// Helper to extract Google Drive file ID
-export function extractGoogleDriveFileId(url: string): string | null {
-  if (!url) return null;
-  const match1 = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if (match1 && match1[1]) return match1[1];
-  const match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
-  if (match2 && match2[1]) return match2[1];
-  return null;
-}
-
 export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
   onOpenInterest,
   onOpenGoogleDrive,
 }) => {
+  const [config, setConfig] = useState<SitePromoVideoConfig>(() => getLocalPromoVideoConfig());
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [isMuted, setIsMuted] = useState<boolean>(true);
-  const [videoSrc, setVideoSrc] = useState<string>(DEFAULT_VIDEO_PATH);
   const [activeScene, setActiveScene] = useState<number>(0);
-  const [customVideoName, setCustomVideoName] = useState<string>('공식 브랜드 홍보영상');
   const [showDriveModal, setShowDriveModal] = useState<boolean>(false);
   const [inputUrl, setInputUrl] = useState<string>('');
-  const [driveUploadStatus, setDriveUploadStatus] = useState<string | null>(null);
-  const [isUploadingToDrive, setIsUploadingToDrive] = useState<boolean>(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [driveVideos, setDriveVideos] = useState<DriveFileItem[]>([]);
   const [isSearchingDrive, setIsSearchingDrive] = useState<boolean>(false);
+  const [videoLoadError, setVideoLoadError] = useState<boolean>(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load saved video source from localStorage on initial render
+  // 1. Fetch & Subscribe to shared promo video configuration from Firestore
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(STORAGE_VIDEO_KEY);
-      if (saved) {
-        setVideoSrc(saved);
-        if (extractGoogleDriveFileId(saved)) {
-          setCustomVideoName('구글 드라이브 홍보영상');
-        } else {
-          setCustomVideoName('사용자 지정 홍보영상');
-        }
-      }
-    }
+    // Initial fetch from Firestore
+    fetchSharedPromoVideoConfig().then((latest) => {
+      setConfig(latest);
+    });
+
+    // Realtime subscription
+    const unsubscribe = subscribePromoVideoConfig((updated) => {
+      setConfig(updated);
+      setVideoLoadError(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  // Scenes from the official promotional video
+  // When config changes, update HTML5 video element if applicable
+  useEffect(() => {
+    if (!config.isGoogleDrive && videoRef.current) {
+      videoRef.current.src = config.videoUrl;
+      videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+    }
+  }, [config.videoUrl, config.isGoogleDrive]);
+
+  // Storyboard highlights matching the luxury complex
   const scenes = [
     {
       id: 0,
@@ -113,71 +121,83 @@ export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
     }
   ];
 
-  // Check if current video source is a Google Drive URL
-  const googleDriveFileId = extractGoogleDriveFileId(videoSrc);
-
-  // Handle local video upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setVideoSrc(url);
-      setCustomVideoName(file.name);
-      setIsPlaying(true);
-      setShowDriveModal(false);
-      if (videoRef.current) {
-        videoRef.current.src = url;
-        videoRef.current.play().catch(() => {});
-      }
-    }
-  };
-
-  // Apply Google Drive URL or custom link
-  const handleApplyUrl = (urlToApply?: string) => {
+  // Save and apply Google Drive URL or custom link to Firestore & local storage
+  const handleApplyUrl = async (urlToApply?: string) => {
     const target = (urlToApply || inputUrl).trim();
-    if (target) {
-      setVideoSrc(target);
-      const isDrive = extractGoogleDriveFileId(target);
-      setCustomVideoName(isDrive ? '구글 드라이브 홍보영상' : '외부 등록 영상');
-      localStorage.setItem(STORAGE_VIDEO_KEY, target);
+    if (!target) return;
+
+    setIsSaving(true);
+    try {
+      const updated = await saveSharedPromoVideoConfig(target);
+      setConfig(updated);
+      setVideoLoadError(false);
       setShowDriveModal(false);
       setInputUrl('');
-      setDriveUploadStatus('홍보영상이 성공적으로 연동되었습니다.');
-      setTimeout(() => setDriveUploadStatus(null), 3500);
+      setStatusMessage('홍보영상이 성공적으로 연동되었습니다! 깃허브 및 모든 접속자에게 동일하게 재생됩니다.');
+      setTimeout(() => setStatusMessage(null), 5000);
       setIsPlaying(true);
-      if (videoRef.current && !isDrive) {
-        videoRef.current.src = target;
-        videoRef.current.play().catch(() => {});
-      }
+    } catch (err: any) {
+      console.error('Save video config failed:', err);
+      setStatusMessage('설정 저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   // Reset to default pre-packaged video
-  const handleResetToDefault = () => {
-    setVideoSrc(DEFAULT_VIDEO_PATH);
-    setCustomVideoName('공식 브랜드 홍보영상');
-    localStorage.removeItem(STORAGE_VIDEO_KEY);
-    setShowDriveModal(false);
-    setIsPlaying(true);
-    if (videoRef.current) {
-      videoRef.current.src = DEFAULT_VIDEO_PATH;
-      videoRef.current.play().catch(() => {});
+  const handleResetToDefault = async () => {
+    setIsSaving(true);
+    try {
+      const updated = await saveSharedPromoVideoConfig(
+        DEFAULT_PROMO_CONFIG.videoUrl,
+        DEFAULT_PROMO_CONFIG.videoTitle
+      );
+      setConfig(updated);
+      setVideoLoadError(false);
+      setShowDriveModal(false);
+      setIsPlaying(true);
+      setStatusMessage('기본 내장 고화질 홍보영상으로 복원되었습니다.');
+      setTimeout(() => setStatusMessage(null), 3500);
+    } catch (e) {
+      console.warn(e);
+    } finally {
+      setIsSaving(false);
     }
-    setDriveUploadStatus('기본 고화질 홍보영상으로 복원되었습니다.');
-    setTimeout(() => setDriveUploadStatus(null), 3000);
+  };
+
+  // Handle local video file upload (Plays locally & offers 1-click cloud sync)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const localUrl = URL.createObjectURL(file);
+      setConfig({
+        videoUrl: localUrl,
+        videoTitle: file.name,
+        isGoogleDrive: false,
+      });
+      setIsPlaying(true);
+      setShowDriveModal(false);
+      if (videoRef.current) {
+        videoRef.current.src = localUrl;
+        videoRef.current.play().catch(() => {});
+      }
+
+      // Prompt cloud synchronization
+      setStatusMessage(`'${file.name}' 영상이 브라우저에서 재생 중입니다. 깃허브 배포 시 모든 방문자에게 공유하려면 [구글 드라이브 영상 연동]을 통해 드라이브 링크를 등록해 주세요.`);
+      setTimeout(() => setStatusMessage(null), 7000);
+    }
   };
 
   // Search user's Google Drive for uploaded video files
   const handleSearchDriveVideos = async () => {
     setIsSearchingDrive(true);
-    setDriveUploadStatus(null);
+    setStatusMessage(null);
     try {
-      // 1. Try dedicated folder first
       let folderId: string | undefined;
       try {
         folderId = await getOrCreateApartmentFolder();
       } catch (e) {
-        // Fallback to general Drive search
+        // Fallback
       }
 
       const files = await listDriveFiles(folderId);
@@ -187,13 +207,13 @@ export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
       setDriveVideos(videos);
 
       if (videos.length === 0) {
-        setDriveUploadStatus('구글 드라이브 폴더에서 검색된 동영상 파일이 없습니다. 상단 입력창에 드라이브 공유 링크를 직접 붙여넣으실 수 있습니다.');
+        setStatusMessage('구글 드라이브 폴더에서 검색된 동영상이 없습니다. 상단 입력창에 공유 링크를 직접 붙여넣으실 수 있습니다.');
       } else {
-        setDriveUploadStatus(`구글 드라이브에서 ${videos.length}개의 동영상을 찾았습니다.`);
+        setStatusMessage(`구글 드라이브에서 ${videos.length}개의 동영상을 찾았습니다. 아래 목록에서 선택하세요.`);
       }
     } catch (err: any) {
       console.warn('Drive search error:', err);
-      setDriveUploadStatus('구글 드라이브 연결이 필요합니다. 헤더의 [Drive 보관함]을 먼저 확인하시거나 드라이브 링크를 직접 입력해 주세요.');
+      setStatusMessage('구글 드라이브 권한이 필요합니다. 상단에 구글 드라이브 공유 링크를 직접 붙여넣어 주세요.');
     } finally {
       setIsSearchingDrive(false);
     }
@@ -222,32 +242,11 @@ export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
     }
   };
 
-  // Upload currently loaded local video to Google Drive
-  const handleSaveVideoToDrive = async () => {
-    const file = fileInputRef.current?.files?.[0];
-    if (!file) {
-      setDriveUploadStatus('업로드된 로컬 동영상 파일이 없습니다. [동영상 파일 올리기]를 먼저 진행해 주세요.');
-      setTimeout(() => setDriveUploadStatus(null), 3500);
-      return;
-    }
-
-    setIsUploadingToDrive(true);
-    setDriveUploadStatus(null);
-    try {
-      const folderId = await getOrCreateApartmentFolder();
-      const uploadedItem = await uploadFileToDrive(file.name, file, folderId, '다대포 오션시티 프레스티지 공식 홍보영상');
-      setDriveUploadStatus(`'${file.name}' 파일이 Google Drive 보관함에 성공적으로 백업되었습니다.`);
-      if (uploadedItem.webViewLink) {
-        handleApplyUrl(uploadedItem.webViewLink);
-      }
-      setTimeout(() => setDriveUploadStatus(null), 4000);
-    } catch (err: any) {
-      console.error('Drive upload failed:', err);
-      setDriveUploadStatus(err.message || 'Google Drive 업로드 실패');
-    } finally {
-      setIsUploadingToDrive(false);
-    }
-  };
+  const driveEmbedUrl = config.isGoogleDrive && config.driveFileId
+    ? `https://drive.google.com/file/d/${config.driveFileId}/preview`
+    : extractGoogleDriveFileId(config.videoUrl)
+    ? toGoogleDriveEmbedUrl(config.videoUrl)
+    : null;
 
   return (
     <section className="space-y-4">
@@ -277,17 +276,16 @@ export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
             다대포 오션시티 프레스티지 공식 홍보영상
           </h3>
           <p className="text-xs sm:text-sm text-slate-400 mt-0.5 break-keep">
-            도보 1분 다대포항역의 스피드와 발아래 펼쳐지는 눈부신 바다의 파노라마를 고화질 영상으로 감상하세요.
+            도보 1분 다대포항역의 쾌속 교통과 눈부신 오션뷰 파노라마를 고화질 영상으로 감상하세요.
           </p>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          {/* Google Drive Video Integration Modal Trigger */}
           <button
             onClick={() => setShowDriveModal(true)}
             className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-500/20 transition-all cursor-pointer"
-            title="구글 드라이브에 업로드된 홍보영상 링크 연동"
+            title="구글 드라이브 홍보영상 공유 링크 등록 & 연동"
           >
             <HardDrive className="w-4 h-4 text-white" />
             <span>구글 드라이브 영상 연동</span>
@@ -296,17 +294,18 @@ export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-slate-700"
-            title="소장하신 영상 파일(MP4, MOV, WebM) 직접 재생"
+            title="PC에 보관된 동영상 파일 직접 재생"
           >
             <Upload className="w-3.5 h-3.5 text-amber-400" />
             <span>파일 올리기</span>
           </button>
 
-          {videoSrc !== DEFAULT_VIDEO_PATH && (
+          {(config.isGoogleDrive || config.videoUrl !== DEFAULT_PROMO_CONFIG.videoUrl) && (
             <button
               onClick={handleResetToDefault}
+              disabled={isSaving}
               className="flex items-center gap-1.5 px-2.5 py-2 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl text-xs transition-colors cursor-pointer border border-slate-800"
-              title="기본 영상으로 초기화"
+              title="기본 탑재 홍보영상으로 초기화"
             >
               <RefreshCw className="w-3 h-3 text-slate-400" />
               <span>기본 영상</span>
@@ -315,19 +314,19 @@ export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
         </div>
       </div>
 
-      {/* Drive Status Message Banner */}
-      {driveUploadStatus && (
-        <div className="bg-blue-950/90 border border-blue-700 p-3 rounded-xl text-xs text-blue-200 flex items-center justify-between">
+      {/* Realtime Status Notice */}
+      {statusMessage && (
+        <div className="bg-blue-950/90 border border-blue-700 p-3 rounded-xl text-xs text-blue-200 flex items-center justify-between animate-in fade-in">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />
-            <span className="break-keep">{driveUploadStatus}</span>
+            <span className="break-keep">{statusMessage}</span>
           </div>
           {onOpenGoogleDrive && (
             <button
               onClick={onOpenGoogleDrive}
               className="text-xs font-bold text-blue-300 underline hover:text-white ml-2 cursor-pointer shrink-0"
             >
-              Drive 보관함 보기
+              Drive 보관함
             </button>
           )}
         </div>
@@ -335,48 +334,52 @@ export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
 
       {/* Main Video Theater Player (16:9 Aspect Ratio) */}
       <div className="relative w-full aspect-video max-h-[580px] bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 shadow-2xl group flex items-center justify-center">
-        {googleDriveFileId ? (
+        {driveEmbedUrl ? (
           /* 1. Google Drive Native Video Embed Preview Player */
           <div className="relative w-full h-full bg-slate-950">
             <iframe
-              src={`https://drive.google.com/file/d/${googleDriveFileId}/preview`}
+              src={driveEmbedUrl}
               className="w-full h-full border-0 rounded-3xl"
               allow="autoplay; fullscreen"
-              title="구글 드라이브 홍보영상"
+              title="다대포 오션시티 공식 홍보영상"
             />
           </div>
         ) : (
-          /* 2. Direct HTML5 High-Performance Video Player */
+          /* 2. Bundled High-Performance HTML5 Video Player */
           <video
             ref={videoRef}
-            src={videoSrc}
+            src={config.videoUrl}
             autoPlay
             playsInline
             loop
             muted={isMuted}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
+            onError={() => {
+              console.warn('Video failed to load, falling back to bundled default');
+              setVideoLoadError(true);
+            }}
             onClick={togglePlay}
             className="w-full h-full object-cover cursor-pointer"
             poster={IMAGES.sunsetAerial}
           />
         )}
 
-        {/* Video Overlays: Top Scene Badge */}
+        {/* Video Overlays: Status Badge */}
         <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 pointer-events-none">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950/85 border border-slate-700/80 backdrop-blur-md shadow-lg">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             <span className="text-[11px] sm:text-xs font-bold text-white tracking-wide truncate max-w-[200px]">
-              {customVideoName}
+              {config.videoTitle}
             </span>
             <span className="text-[10px] text-amber-400 font-semibold px-1.5 py-0.2 rounded bg-amber-950/60 border border-amber-800/60 shrink-0">
-              {googleDriveFileId ? '구글 드라이브 연동' : '고화질 스트리밍'}
+              {driveEmbedUrl ? '구글 드라이브 연동' : '고화질 스트리밍'}
             </span>
           </div>
         </div>
 
         {/* Play/Pause Overlay Icon for HTML5 Video */}
-        {!googleDriveFileId && !isPlaying && (
+        {!driveEmbedUrl && !isPlaying && (
           <div 
             onClick={togglePlay}
             className="absolute inset-0 flex items-center justify-center bg-black/40 z-20 cursor-pointer"
@@ -388,7 +391,7 @@ export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
         )}
 
         {/* Floating Custom Controls Bar (for HTML5 video) */}
-        {!googleDriveFileId && (
+        {!driveEmbedUrl && (
           <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4 z-20 flex items-center justify-between p-2.5 sm:p-3 rounded-2xl bg-slate-950/80 backdrop-blur-md border border-slate-800/90 opacity-90 group-hover:opacity-100 transition-opacity">
             <div className="flex items-center gap-3">
               <button
@@ -418,7 +421,7 @@ export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
               <button
                 onClick={() => setShowDriveModal(true)}
                 className="px-2.5 py-1.5 rounded-lg bg-blue-950/80 hover:bg-blue-900 border border-blue-700/60 text-blue-300 text-xs font-semibold flex items-center gap-1 cursor-pointer"
-                title="구글 드라이브 링크로 영상 변경"
+                title="구글 드라이브 링크로 영상 연동"
               >
                 <HardDrive className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Drive 링크</span>
@@ -486,10 +489,10 @@ export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
                 </div>
                 <div>
                   <h4 className="text-base font-bold text-white">
-                    Google Drive 홍보영상 연동
+                    Google Drive 홍보영상 연동 설정
                   </h4>
                   <p className="text-xs text-slate-400">
-                    구글 드라이브에 업로드된 동영상 링크를 바로 재생합니다
+                    깃허브 배포 및 모든 접속자에게 실시간 공유되는 영상 링크
                   </p>
                 </div>
               </div>
@@ -502,6 +505,17 @@ export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
             </div>
 
             <div className="space-y-4">
+              {/* Notice for GitHub Deployments */}
+              <div className="bg-blue-950/40 border border-blue-800/60 rounded-xl p-3 text-xs text-blue-200 leading-relaxed space-y-1">
+                <p className="font-bold flex items-center gap-1.5 text-blue-300">
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>깃허브 배포 및 모든 접속자 공유 안내</span>
+                </p>
+                <p className="text-[11px] text-slate-300 break-keep">
+                  구글 드라이브에 동영상을 올리신 후 <strong>[링크 복사]</strong>(링크가 있는 모든 사용자 보기 권한)를 하여 아래에 등록하시면, Firestore를 통해 <strong>깃허브 배포 도메인으로 접속하는 모든 방문자에게 업로드 창 없이 영상이 즉시 재생</strong>됩니다.
+                </p>
+              </div>
+
               {/* Option 1: Direct Paste Google Drive Link */}
               <div>
                 <label className="text-xs font-semibold text-slate-300 block mb-1.5">
@@ -512,19 +526,17 @@ export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
                     type="url"
                     value={inputUrl}
                     onChange={(e) => setInputUrl(e.target.value)}
-                    placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
+                    placeholder="https://drive.google.com/file/d/1w8y.../view?usp=sharing"
                     className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 font-mono"
                   />
                   <button
                     onClick={() => handleApplyUrl()}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0"
+                    disabled={isSaving || !inputUrl.trim()}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0"
                   >
-                    연동 적용
+                    {isSaving ? '저장 중...' : '연동 적용'}
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed break-keep">
-                  ※ Google Drive에서 동영상 파일 우클릭 ➔ <strong>[링크 복사]</strong> (누구나 볼 수 있도록 설정) 후 붙여넣으시면 즉시 스트리밍 재생됩니다.
-                </p>
               </div>
 
               {/* Option 2: Search Google Drive Folder */}
@@ -571,7 +583,7 @@ export const PromoVideoSection: React.FC<PromoVideoSectionProps> = ({
                   className="text-xs text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <RefreshCw className="w-3 h-3" />
-                  <span>기본 탑재 고화질 영상으로 재생</span>
+                  <span>기본 내장 고화질 영상으로 재생</span>
                 </button>
 
                 <button
