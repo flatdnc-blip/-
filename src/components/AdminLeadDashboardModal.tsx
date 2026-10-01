@@ -36,13 +36,22 @@ import {
   downloadRegistrationsAsCSV, 
   saveRegistrationsCSVToDrive,
   subscribeToInterestRegistrations,
-  requestNotificationPermission
+  requestNotificationPermission,
+  sendLeadTelegramAndMark,
+  sendAllUnsentLeads
 } from '../services/interestRegistrationService';
 import {
   getGoogleChatWebhookUrl,
   saveGoogleChatWebhookUrl,
   sendLeadToGoogleChat
 } from '../services/googleChatService';
+import {
+  getTelegramConfig,
+  getTelegramConfigAsync,
+  saveTelegramConfig,
+  sendTestMessageToTelegram,
+  TelegramConfig
+} from '../services/telegramService';
 
 interface AdminLeadDashboardModalProps {
   isOpen: boolean;
@@ -69,13 +78,26 @@ export const AdminLeadDashboardModal: React.FC<AdminLeadDashboardModalProps> = (
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [showChatSettings, setShowChatSettings] = useState(false);
+  const [activeNotificationTab, setActiveNotificationTab] = useState<'telegram' | 'googleChat'>('telegram');
   const [chatWebhookUrl, setChatWebhookUrl] = useState('');
   const [isTestingChat, setIsTestingChat] = useState(false);
+  const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>({
+    botToken: '',
+    chatId: '',
+    enabled: true,
+  });
+  const [isTestingTelegram, setIsTestingTelegram] = useState(false);
+  const [sendingLeadId, setSendingLeadId] = useState<string | null>(null);
+  const [isSendingUnsent, setIsSendingUnsent] = useState(false);
+  const [unsentProgress, setUnsentProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Detect screen size on mount to select optimal view
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setChatWebhookUrl(getGoogleChatWebhookUrl());
+      getTelegramConfigAsync().then((cfg) => {
+        setTelegramConfig(cfg);
+      });
       if (window.innerWidth >= 1024) {
         setViewStyle('table');
       } else {
@@ -138,6 +160,7 @@ export const AdminLeadDashboardModal: React.FC<AdminLeadDashboardModalProps> = (
   // Calculate reservation stats
   const totalReservations = leads.filter((l) => l.visitDate && l.visitDate.trim() !== '').length;
   const todayReservations = leads.filter((l) => l.visitDate === todayStr).length;
+  const unsentCount = leads.filter((l) => !l.telegramNotified).length;
 
   const handleStatusChange = async (id: string, newStatus: StoredInterestRegistration['status']) => {
     await updateRegistrationStatus(id, newStatus);
@@ -205,6 +228,68 @@ export const AdminLeadDashboardModal: React.FC<AdminLeadDashboardModalProps> = (
     setTimeout(() => setActionMessage(null), 3000);
   };
 
+  const handleSaveTelegram = async () => {
+    await saveTelegramConfig(telegramConfig);
+    setActionMessage('텔레그램 알림 설정이 클라우드에 성공적으로 저장되었습니다.');
+    setTimeout(() => setActionMessage(null), 3000);
+  };
+
+  const handleTestTelegram = async () => {
+    setIsTestingTelegram(true);
+    const res = await sendTestMessageToTelegram(telegramConfig.botToken, telegramConfig.chatId);
+    setActionMessage(res.message);
+    setTimeout(() => setActionMessage(null), 5000);
+    setIsTestingTelegram(false);
+  };
+
+  const handleSendSingleLead = async (lead: StoredInterestRegistration) => {
+    setSendingLeadId(lead.id);
+    const res = await sendLeadTelegramAndMark(lead);
+    if (res.success) {
+      setLeads((prev) =>
+        prev.map((l) =>
+          l.id === lead.id
+            ? { ...l, telegramNotified: true, telegramNotifiedAt: new Date().toISOString() }
+            : l
+        )
+      );
+      setActionMessage(`[${lead.name}] 고객님의 접수 정보가 텔레그램으로 전송되었습니다.`);
+    } else {
+      setActionMessage(`전송 실패: ${res.message}`);
+    }
+    setTimeout(() => setActionMessage(null), 4000);
+    setSendingLeadId(null);
+  };
+
+  const handleSendAllUnsent = async () => {
+    const unsent = leads.filter((l) => !l.telegramNotified);
+    if (unsent.length === 0) {
+      setActionMessage('텔레그램으로 보낼 미발송 고객 데이터가 없습니다.');
+      setTimeout(() => setActionMessage(null), 3000);
+      return;
+    }
+
+    setIsSendingUnsent(true);
+    setUnsentProgress({ current: 0, total: unsent.length });
+
+    const result = await sendAllUnsentLeads(leads, (curr, tot) => {
+      setUnsentProgress({ current: curr, total: tot });
+    });
+
+    setLeads((prev) =>
+      prev.map((l) =>
+        !l.telegramNotified
+          ? { ...l, telegramNotified: true, telegramNotifiedAt: new Date().toISOString() }
+          : l
+      )
+    );
+
+    setActionMessage(`기존 미발송 고객 ${result.sent}건의 텔레그램 발송이 완료되었습니다!`);
+    setTimeout(() => setActionMessage(null), 5000);
+    setIsSendingUnsent(false);
+    setUnsentProgress(null);
+  };
+
   const handleTestGoogleChat = async () => {
     setIsTestingChat(true);
     const mockLead: StoredInterestRegistration = leads.find(l => l.visitDate) || leads[0] || {
@@ -270,14 +355,20 @@ export const AdminLeadDashboardModal: React.FC<AdminLeadDashboardModalProps> = (
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Google Chat Webhook Integration Button */}
+            {/* Realtime Messenger Notification Button (Telegram & Google Chat) */}
             <button
-              onClick={() => setShowChatSettings(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer border bg-blue-950/60 text-blue-300 border-blue-700 hover:bg-blue-900"
-              title="관리자 Google Chat 방문예약 알림 설정"
+              onClick={() => {
+                setShowChatSettings(true);
+                setActiveNotificationTab('telegram');
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer border bg-sky-950/70 text-sky-300 border-sky-600 hover:bg-sky-900 shadow-sm"
+              title="실시간 텔레그램 / Google Chat 알림 연동"
             >
-              <MessageCircle className="w-3.5 h-3.5 text-blue-400" />
-              <span className="hidden sm:inline">Google Chat 알림</span>
+              <Send className="w-3.5 h-3.5 text-sky-400" />
+              <span className="hidden sm:inline">실시간 메신저 알림</span>
+              {telegramConfig.enabled && telegramConfig.botToken && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" title="텔레그램 알림 활성화됨" />
+              )}
             </button>
 
             {/* Notification Permission Toggle */}
@@ -353,14 +444,47 @@ export const AdminLeadDashboardModal: React.FC<AdminLeadDashboardModalProps> = (
           </div>
         )}
 
+        {/* Unsent Leads Notification Banner */}
+        {unsentCount > 0 && telegramConfig.botToken && (
+          <div className="bg-gradient-to-r from-sky-950 via-slate-900 to-sky-950 border-b border-sky-700/60 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs animate-in slide-in-from-top-1 duration-200">
+            <div className="flex items-center gap-2 text-sky-200">
+              <Send className="w-4 h-4 text-sky-400 shrink-0 animate-pulse" />
+              <span>
+                텔레그램 알림을 아직 보내지 않은 기존 고객이 <strong className="text-white font-bold underline underline-offset-2">{unsentCount}명</strong> 있습니다.
+              </span>
+            </div>
+            <button
+              onClick={handleSendAllUnsent}
+              disabled={isSendingUnsent}
+              className="px-3.5 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-md disabled:opacity-50"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>
+                {isSendingUnsent
+                  ? `텔레그램 발송 중 (${unsentProgress?.current}/${unsentProgress?.total})...`
+                  : `미발송 고객 전체 텔레그램 전송 (${unsentCount}건)`}
+              </span>
+            </button>
+          </div>
+        )}
+
         {/* Main Content Area */}
         <div className="p-3.5 sm:p-6 overflow-y-auto space-y-4 sm:space-y-5">
           {/* Top Metric Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
             <div className="bg-slate-950/80 p-3 sm:p-3.5 rounded-2xl border border-slate-800 flex flex-col justify-between">
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider break-keep">총 관심고객 접수</p>
-              <p className="text-xl sm:text-2xl font-black text-amber-400 font-mono mt-0.5">{leads.length}건</p>
-              <p className="text-[10px] text-slate-500 break-keep">실시간 누적 DB</p>
+              <div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider break-keep">총 관심고객 접수</p>
+                <p className="text-xl sm:text-2xl font-black text-amber-400 font-mono mt-0.5">{leads.length}건</p>
+              </div>
+              <div className="flex items-center justify-between mt-1 text-[10px]">
+                <span className="text-slate-500">실시간 누적 DB</span>
+                {unsentCount > 0 ? (
+                  <span className="text-amber-400 font-semibold">미발송 {unsentCount}건</span>
+                ) : (
+                  <span className="text-emerald-400 font-semibold">전송 100%</span>
+                )}
+              </div>
             </div>
             <div className="bg-slate-950/80 p-3 sm:p-3.5 rounded-2xl border border-slate-800 flex flex-col justify-between">
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider break-keep">홍보관 방문 예약</p>
@@ -531,6 +655,23 @@ export const AdminLeadDashboardModal: React.FC<AdminLeadDashboardModalProps> = (
                                 <option value="보류">보류</option>
                               </select>
 
+                              {lead.telegramNotified ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-emerald-950/60 border border-emerald-800/60 text-emerald-400 font-medium whitespace-nowrap">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>알림완료</span>
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleSendSingleLead(lead)}
+                                  disabled={sendingLeadId === lead.id}
+                                  className="px-2 py-1 bg-sky-950/80 hover:bg-sky-900 border border-sky-600 text-sky-200 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                                  title="텔레그램으로 알림 즉시 발송"
+                                >
+                                  <Send className="w-3 h-3 text-sky-400" />
+                                  <span>{sendingLeadId === lead.id ? '전송...' : '알림발송'}</span>
+                                </button>
+                              )}
+
                               <button
                                 onClick={() => handleOpenNotesModal(lead)}
                                 className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold cursor-pointer"
@@ -665,8 +806,39 @@ export const AdminLeadDashboardModal: React.FC<AdminLeadDashboardModalProps> = (
                         </button>
                       </div>
 
-                      {/* Card Footer Delete */}
-                      <div className="flex justify-end pt-1">
+                      {/* Card Footer: Notification Status & Actions */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+                        <div className="flex items-center gap-1.5">
+                          {lead.telegramNotified ? (
+                            <span 
+                              className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full font-medium"
+                              title={lead.telegramNotifiedAt ? `발송일시: ${new Date(lead.telegramNotifiedAt).toLocaleString('ko-KR')}` : ''}
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>텔레그램 발송됨</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-amber-300 bg-amber-950/60 border border-amber-800/60 px-2 py-0.5 rounded-full font-medium">
+                              <Clock className="w-3 h-3 text-amber-400" />
+                              <span>알림 미발송</span>
+                            </span>
+                          )}
+
+                          <button
+                            onClick={() => handleSendSingleLead(lead)}
+                            disabled={sendingLeadId === lead.id}
+                            className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer border ${
+                              lead.telegramNotified
+                                ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                                : 'bg-sky-950/80 border-sky-600 text-sky-200 hover:bg-sky-900'
+                            }`}
+                            title={lead.telegramNotified ? "텔레그램으로 다시 발송" : "텔레그램으로 고객 접수 알림 즉시 발송"}
+                          >
+                            <Send className="w-3 h-3 text-sky-400" />
+                            <span>{sendingLeadId === lead.id ? '전송 중...' : lead.telegramNotified ? '재전송' : '텔레그램 발송'}</span>
+                          </button>
+                        </div>
+
                         <button
                           onClick={() => handleDelete(lead.id)}
                           className="text-[11px] text-slate-500 hover:text-rose-400 flex items-center gap-1 transition-colors cursor-pointer"
@@ -696,13 +868,14 @@ export const AdminLeadDashboardModal: React.FC<AdminLeadDashboardModalProps> = (
                       <th className="px-4 py-3 whitespace-nowrap">방문예약일시</th>
                       <th className="px-4 py-3 whitespace-nowrap">접수일시</th>
                       <th className="px-4 py-3 whitespace-nowrap">상담상태</th>
+                      <th className="px-4 py-3 whitespace-nowrap">텔레그램 알림</th>
                       <th className="px-4 py-3">상담메모 / 관리</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/80">
                     {filteredLeads.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                        <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
                           {loading ? '실시간 데이터를 불러오는 중입니다...' : '검색 조건에 일치하는 데이터가 없습니다.'}
                         </td>
                       </tr>
@@ -762,6 +935,37 @@ export const AdminLeadDashboardModal: React.FC<AdminLeadDashboardModalProps> = (
                               <option value="부재">부재</option>
                               <option value="보류">보류</option>
                             </select>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              {lead.telegramNotified ? (
+                                <span 
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-emerald-950/60 border border-emerald-800/60 text-emerald-400 font-medium"
+                                  title={lead.telegramNotifiedAt ? `발송일시: ${new Date(lead.telegramNotifiedAt).toLocaleString('ko-KR')}` : ''}
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>전송완료</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-amber-950/60 border border-amber-800/60 text-amber-300 font-medium">
+                                  <Clock className="w-3 h-3 text-amber-400" />
+                                  <span>미발송</span>
+                                </span>
+                              )}
+                              <button
+                                onClick={() => handleSendSingleLead(lead)}
+                                disabled={sendingLeadId === lead.id}
+                                className={`px-2 py-0.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
+                                  lead.telegramNotified
+                                    ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                                    : 'bg-sky-950/80 border-sky-600 text-sky-200 hover:bg-sky-900'
+                                }`}
+                                title={lead.telegramNotified ? '텔레그램 재전송' : '텔레그램으로 알림 즉시 발송'}
+                              >
+                                <Send className="w-3 h-3 text-sky-400" />
+                                <span>{sendingLeadId === lead.id ? '전송...' : lead.telegramNotified ? '재전송' : '발송'}</span>
+                              </button>
+                            </div>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
@@ -851,84 +1055,243 @@ export const AdminLeadDashboardModal: React.FC<AdminLeadDashboardModalProps> = (
           </div>
         )}
 
-        {/* Modal for Google Chat Webhook Integration Settings */}
+        {/* Modal for Realtime Messenger Notification Settings (Telegram & Google Chat) */}
         {showChatSettings && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-xl w-full p-4 sm:p-6 space-y-4 shadow-2xl animate-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto">
+              {/* Modal Header */}
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
-                    <MessageCircle className="w-4 h-4" />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400">
+                    <Send className="w-4 h-4" />
                   </div>
                   <div>
                     <h4 className="text-base font-bold text-white">
-                      Google Chat 방문고객 알림 설정
+                      실시간 메신저 알림 연동 설정
                     </h4>
                     <p className="text-xs text-slate-400">
-                      신규 관심고객 및 모델하우스 방문예약 시 실시간 구글 챗 발송
+                      신규 관심고객 접수 및 홍보관 방문예약 시 스마트폰으로 즉시 알림
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowChatSettings(false)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
+                  className="text-slate-400 hover:text-white p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="space-y-3">
-                <div className="bg-blue-950/40 border border-blue-800/60 rounded-xl p-3 text-xs text-blue-200 leading-relaxed space-y-1">
-                  <p className="font-bold flex items-center gap-1.5 text-blue-300">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Google Chat 인커밍 웹훅(Incoming Webhook) 연동 안내</span>
-                  </p>
-                  <p className="text-[11px] text-slate-300 break-keep">
-                    구글 챗 스페이스(채널) 설정 ➔ [앱 및 통합] ➔ [웹훅 관리]에서 생성하신 Webhook URL을 아래에 등록하시면, 방문예약 신청 즉시 관리자 채널로 정형화된 카드 메시지가 자동 발송됩니다.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-300 block mb-1">
-                    Google Chat Webhook URL
-                  </label>
-                  <input
-                    type="url"
-                    value={chatWebhookUrl}
-                    onChange={(e) => setChatWebhookUrl(e.target.value)}
-                    placeholder="https://chat.googleapis.com/v1/spaces/.../messages?key=...&token=..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-400 font-mono"
-                  />
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    ※ 미입력 시에도 브라우저 콘솔 및 내부 알림 시스템으로 시뮬레이션 처리됩니다.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleTestGoogleChat}
-                    disabled={isTestingChat}
-                    className="flex-1 py-2 px-3 bg-blue-900/60 hover:bg-blue-800 border border-blue-700 text-blue-200 hover:text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>{isTestingChat ? '전송 중...' : '테스트 메시지 즉시 전송'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleSaveChatWebhook}
-                    className="py-2 px-4 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    저장하기
-                  </button>
-                </div>
+              {/* Tab Selector */}
+              <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setActiveNotificationTab('telegram')}
+                  className={`py-2 px-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    activeNotificationTab === 'telegram'
+                      ? 'bg-sky-500 text-slate-950 font-bold shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>텔레그램 (무료 추천 ⭐)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveNotificationTab('googleChat')}
+                  className={`py-2 px-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    activeNotificationTab === 'googleChat'
+                      ? 'bg-blue-600 text-white font-bold shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>Google Chat (기업용)</span>
+                </button>
               </div>
+
+              {/* TAB 1: TELEGRAM SETTINGS */}
+              {activeNotificationTab === 'telegram' && (
+                <div className="space-y-4 animate-in fade-in duration-150">
+                  <div className="bg-sky-950/40 border border-sky-800/60 rounded-2xl p-3.5 text-xs text-sky-200 leading-relaxed space-y-1">
+                    <p className="font-bold flex items-center gap-1.5 text-sky-300">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>개인 계정도 1분 만에 100% 무료 연동 가능한 텔레그램 알림</span>
+                    </p>
+                    <p className="text-[11px] text-slate-300 break-keep">
+                      구글 정책과 무관하게 개인 스마트폰 텔레그램 앱으로 손님의 성함, 연락처, 방문일시를 1초 만에 받아보실 수 있습니다.
+                    </p>
+                  </div>
+
+                  {/* Toggle Active */}
+                  <div className="flex items-center justify-between p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+                    <div>
+                      <span className="text-xs font-semibold text-white block">텔레그램 실시간 알림 발송</span>
+                      <span className="text-[11px] text-slate-400 block">고객 신청서 제출 시 관리자에게 즉시 메시지 발송</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={telegramConfig.enabled}
+                        onChange={(e) => setTelegramConfig(prev => ({ ...prev, enabled: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
+                    </label>
+                  </div>
+
+                  {/* Bot Token Input */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300 block mb-1">
+                      1. 텔레그램 봇 토큰 (Bot Token) <span className="text-sky-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={telegramConfig.botToken}
+                      onChange={(e) => setTelegramConfig(prev => ({ ...prev, botToken: e.target.value }))}
+                      placeholder="예: 7123456789:AAHk..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-sky-400 font-mono"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      ※ 텔레그램에서 @BotFather에게 /newbot 명령어로 발급받은 토큰
+                    </p>
+                  </div>
+
+                  {/* Chat ID Input */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300 block mb-1">
+                      2. 내 채팅 ID (Chat ID) <span className="text-sky-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={telegramConfig.chatId}
+                      onChange={(e) => setTelegramConfig(prev => ({ ...prev, chatId: e.target.value }))}
+                      placeholder="예: 123456789 (숫자)"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-sky-400 font-mono"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      ※ 텔레그램에서 @userinfobot에게 받은 나의 고유 숫자 ID
+                    </p>
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleTestTelegram}
+                      disabled={isTestingTelegram || !telegramConfig.botToken || !telegramConfig.chatId}
+                      className="flex-1 py-2.5 px-3 bg-sky-900/60 hover:bg-sky-800 border border-sky-700 text-sky-200 hover:text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isTestingTelegram ? '전송 중...' : '테스트 알림 즉시 발송'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveTelegram}
+                      className="py-2.5 px-5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      설정 저장하기
+                    </button>
+                  </div>
+
+                  {/* Batch Send for Existing Unsent Leads */}
+                  <div className="p-3.5 bg-slate-950/90 border border-slate-800 rounded-2xl space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                      <div>
+                        <span className="font-bold text-white block">기존 고객DB 텔레그램 발송 이력 관리</span>
+                        <span className="text-[11px] text-slate-400">
+                          전체 {leads.length}명 중 텔레그램 미발송 고객: <strong className={unsentCount > 0 ? "text-amber-400 font-bold" : "text-emerald-400 font-bold"}>{unsentCount}명</strong>
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSendAllUnsent}
+                        disabled={isSendingUnsent || unsentCount === 0 || !telegramConfig.botToken || !telegramConfig.chatId}
+                        className="py-2 px-3.5 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>
+                          {isSendingUnsent
+                            ? `발송 중 (${unsentProgress?.current}/${unsentProgress?.total})...`
+                            : `미발송 ${unsentCount}건 텔레그램 일괄 전송`}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 3-Step Guide */}
+                  <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-[11px] space-y-2 text-slate-300">
+                    <p className="font-bold text-sky-400 flex items-center gap-1">
+                      <span>📖 텔레그램 2분 초간단 설정 순서</span>
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1.5 text-slate-400 leading-relaxed">
+                      <li>
+                        텔레그램 검색창에 <code className="text-white bg-slate-800 px-1 py-0.5 rounded">@BotFather</code> 검색 ➔ 대화방에서 <code className="text-amber-300">/newbot</code> 입력 ➔ 봇 이름 & 아이디(영문_bot) 입력 ➔ 발급된 <strong>HTTP API 토큰</strong> 복사
+                      </li>
+                      <li>
+                        텔레그램 검색창에 <code className="text-white bg-slate-800 px-1 py-0.5 rounded">@userinfobot</code> 검색 ➔ 아무 글자나 보내고 표시되는 <strong>Id(숫자)</strong> 복사
+                      </li>
+                      <li className="text-amber-300 font-semibold">
+                        ⚠️ 1단계에서 만든 내 봇 대화방으로 들어가 하단의 [시작(Start)] 버튼을 꼭 눌러주세요! (눌러야 봇이 메시지를 보낼 수 있습니다)
+                      </li>
+                    </ol>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: GOOGLE CHAT SETTINGS */}
+              {activeNotificationTab === 'googleChat' && (
+                <div className="space-y-3 animate-in fade-in duration-150">
+                  <div className="bg-amber-950/30 border border-amber-800/60 rounded-xl p-3 text-xs text-amber-200 leading-relaxed space-y-1">
+                    <p className="font-bold flex items-center gap-1.5 text-amber-300">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Google Workspace 기업용 계정 전용 안내</span>
+                    </p>
+                    <p className="text-[11px] text-slate-300 break-keep">
+                      구글 공식 정책상 인커밍 웹훅은 유료 Google Workspace 계정에서만 생성 가능합니다. 일반 @gmail.com 계정은 상단의 <strong>[텔레그램]</strong> 탭을 이용해 주세요.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300 block mb-1">
+                      Google Chat Webhook URL
+                    </label>
+                    <input
+                      type="url"
+                      value={chatWebhookUrl}
+                      onChange={(e) => setChatWebhookUrl(e.target.value)}
+                      placeholder="https://chat.googleapis.com/v1/spaces/.../messages?key=...&token=..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-400 font-mono"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleTestGoogleChat}
+                      disabled={isTestingChat}
+                      className="flex-1 py-2 px-3 bg-blue-900/60 hover:bg-blue-800 border border-blue-700 text-blue-200 hover:text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isTestingChat ? '전송 중...' : '구글챗 테스트 전송'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveChatWebhook}
+                      className="py-2 px-4 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      저장하기
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="border-t border-slate-800 pt-3 flex justify-end">
                 <button
                   onClick={() => setShowChatSettings(false)}
-                  className="px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 transition-colors cursor-pointer"
                 >
                   닫기
                 </button>

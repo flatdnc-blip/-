@@ -12,6 +12,7 @@ import {
 import { db, auth } from './firebaseAuth';
 import { uploadFileToDrive, getOrCreateApartmentFolder } from './googleDriveService';
 import { sendLeadToGoogleChat } from './googleChatService';
+import { sendLeadToTelegram } from './telegramService';
 
 export interface StoredInterestRegistration {
   id: string;
@@ -26,6 +27,8 @@ export interface StoredInterestRegistration {
   notes?: string;
   visitDate?: string;
   visitTime?: string;
+  telegramNotified?: boolean;
+  telegramNotifiedAt?: string;
 }
 
 enum OperationType {
@@ -208,6 +211,7 @@ export async function submitInterestRegistration(data: {
     notes: '',
     visitDate: data.visitDate || '',
     visitTime: data.visitTime || '',
+    telegramNotified: false,
   };
 
   // 1. Save to local storage
@@ -216,8 +220,20 @@ export async function submitInterestRegistration(data: {
   // 2. Trigger notification
   sendLeadNotification(record);
 
-  // 2.1 Send Google Chat message to admin
+  // 2.1 Send Google Chat message to admin (if configured)
   sendLeadToGoogleChat(record).catch((e) => console.warn('Google Chat dispatch error:', e));
+
+  // 2.2 Send Telegram message to admin (if configured) and update status
+  try {
+    const telegramRes = await sendLeadToTelegram(record);
+    if (telegramRes && telegramRes.success) {
+      record.telegramNotified = true;
+      record.telegramNotifiedAt = new Date().toISOString();
+      saveToLocalStorage(record);
+    }
+  } catch (e) {
+    console.warn('Telegram dispatch error:', e);
+  }
 
   // 3. Save to Firestore
   try {
@@ -358,6 +374,76 @@ export async function updateRegistrationStatus(
   } catch (error) {
     console.warn('Firestore update failed:', error);
   }
+}
+
+/**
+ * Update notification status on a lead (marks telegramNotified: true)
+ */
+export async function updateLeadNotificationStatus(
+  id: string,
+  telegramNotified: boolean,
+  telegramNotifiedAt?: string
+): Promise<void> {
+  const timestamp = telegramNotifiedAt || new Date().toISOString();
+  const localList = getFromLocalStorage();
+  const updatedList = localList.map((item) => 
+    item.id === id ? { ...item, telegramNotified, telegramNotifiedAt: timestamp } : item
+  );
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
+
+  window.dispatchEvent(new CustomEvent('new-lead-registered'));
+
+  try {
+    const docRef = doc(db, COLLECTION_NAME, id);
+    await updateDoc(docRef, { 
+      telegramNotified, 
+      telegramNotifiedAt: timestamp 
+    });
+  } catch (error) {
+    console.warn('Firestore updateLeadNotificationStatus failed:', error);
+  }
+}
+
+/**
+ * Send a specific lead to Telegram and mark it notified in DB
+ */
+export async function sendLeadTelegramAndMark(
+  lead: StoredInterestRegistration
+): Promise<{ success: boolean; message: string }> {
+  const res = await sendLeadToTelegram(lead);
+  if (res.success) {
+    await updateLeadNotificationStatus(lead.id, true, new Date().toISOString());
+  }
+  return res;
+}
+
+/**
+ * Batch send Telegram messages for all unsent leads in DB
+ */
+export async function sendAllUnsentLeads(
+  leads: StoredInterestRegistration[],
+  onProgress?: (current: number, total: number) => void
+): Promise<{ total: number; sent: number; failed: number }> {
+  const unsent = leads.filter(l => !l.telegramNotified);
+  let sent = 0;
+  let failed = 0;
+
+  for (let i = 0; i < unsent.length; i++) {
+    const lead = unsent[i];
+    if (onProgress) {
+      onProgress(i + 1, unsent.length);
+    }
+    const res = await sendLeadTelegramAndMark(lead);
+    if (res.success) {
+      sent++;
+    } else {
+      failed++;
+    }
+    // Small 300ms pause to respect Telegram API rate limits
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  return { total: unsent.length, sent, failed };
 }
 
 /**
